@@ -3,14 +3,7 @@ import sys
 import random
 import time
 import math
-<<<<<<< HEAD
 import json
-=======
-import socket
-import threading
-import json
-import select
->>>>>>> 19cd523d330dac0de51f22d99ce50ac914e0fe58
 
 # Initialize Pygame
 pygame.init()
@@ -608,76 +601,49 @@ class Game:
 
         running = True
         while running:
-<<<<<<< HEAD
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        if self.game_over:
-                            self.__init__()
-                        elif self.showing_story:
+            if self.menu_active:
+                running = self.handle_menu_input()
+                self.show_menu()
+            elif self.paused:
+                running = self.handle_pause_input()
+                self.show_pause_menu()
+            elif self.showing_story:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_SPACE:
                             self.story_phase += 1
                             self.story_start_time = time.time()
                             if self.story_phase >= len(self.story_text):
                                 self.showing_story = False
                                 self.update_story_setting()
-
-            screen.fill(BLACK)
-
-            # Draw stars
-            for star in self.stars:
-                star.move()
-                star.draw()
-
-            if self.showing_story:
+                
+                screen.fill(BLACK)
+                
+                # Draw stars
+                for star in self.stars:
+                    star.move()
+                    star.draw()
+                
                 self.handle_story()
             elif self.game_over:
-                game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
-                screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
-=======
-            if self.menu_active:
-                running = self.handle_menu_input()
-                self.show_menu()
-            elif self.paused:
-                # Handle pause menu
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
                     elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.paused = False
-                        elif event.key == pygame.K_UP:
-                            self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                        elif event.key == pygame.K_DOWN:
-                            self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                        elif event.key == pygame.K_RETURN:
-                            if self.selected_pause_option == 0:  # Resume
-                                self.paused = False
-                            elif self.selected_pause_option == 1:  # Restart
-                                self.__init__()
-                            elif self.selected_pause_option == 2:  # Exit to Menu
-                                self.menu_active = True
-                                self.paused = False
-                                self.network = None
-                                self.player = None
-                                self.other_players = {}
+                        if event.key == pygame.K_SPACE:
+                            self.__init__()
                 
-                # Draw pause menu
-                overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 128))
-                screen.blit(overlay, (0, 0))
+                screen.fill(BLACK)
                 
-                title = self.font.render("PAUSED", True, WHITE)
-                screen.blit(title, (WINDOW_WIDTH/2 - 50, 200))
+                # Draw stars
+                for star in self.stars:
+                    star.move()
+                    star.draw()
                 
-                for i, option in enumerate(self.pause_options):
-                    color = GREEN if i == self.selected_pause_option else WHITE
-                    text = self.font.render(option, True, color)
-                    screen.blit(text, (WINDOW_WIDTH/2 - 100, 300 + i * 50))
-                
-                pygame.display.flip()
->>>>>>> 19cd523d330dac0de51f22d99ce50ac914e0fe58
+                game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
+                screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
             else:
                 # Gameplay loop
                 for event in pygame.event.get():
@@ -694,6 +660,7 @@ class Game:
                                 self.story_start_time = time.time()
                                 if self.story_phase >= len(self.story_text):
                                     self.showing_story = False
+                                    self.update_story_setting()
 
                 screen.fill(BLACK)
 
@@ -702,71 +669,65 @@ class Game:
                     star.move()
                     star.draw()
 
-                if self.showing_story:
-                    self.handle_story()
-                elif self.game_over:
-                    game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
-                    screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
-                else:
-                    # Gameplay
-                    if self.player:
-                        self.player.move()
-                        if self.network and self.network.connected:
-                            self.network.send_data(self.player.get_state())
-                            for player_id, player_data in self.network.other_players.items():
-                                if player_id not in self.other_players:
-                                    self.other_players[player_id] = Player(
-                                        player_data['x'],
-                                        None,
-                                        RED if player_id == "2" else BLUE,
-                                        f"Player {player_id}",
-                                        player_id
-                                    )
-                                self.other_players[player_id].update_from_state(player_data)
+                # Gameplay
+                if self.player:
+                    self.player.move()
+                    if self.network and self.network.connected:
+                        self.network.send_data(self.player.get_state())
+                        for player_id, player_data in self.network.other_players.items():
+                            if player_id not in self.other_players:
+                                self.other_players[player_id] = Player(
+                                    player_data['x'],
+                                    None,
+                                    RED if player_id == "2" else BLUE,
+                                    f"Player {player_id}",
+                                    player_id
+                                )
+                            self.other_players[player_id].update_from_state(player_data)
 
-                    self.spawn_obstacle()
-                    self.spawn_powerup()
+                self.spawn_obstacle()
+                self.spawn_powerup()
 
-                    # Update and draw powerups
-                    for powerup in self.powerups[:]:
-                        powerup.move()
-                        powerup.draw()
-                        if powerup.rect.top > WINDOW_HEIGHT:
-                            self.powerups.remove(powerup)
-                        elif self.player and powerup.rect.colliderect(self.player.rect):
-                            self.player.activate_powerup(powerup.type)
-                            self.powerups.remove(powerup)
+                # Update and draw powerups
+                for powerup in self.powerups[:]:
+                    powerup.move()
+                    powerup.draw()
+                    if powerup.rect.top > WINDOW_HEIGHT:
+                        self.powerups.remove(powerup)
+                    elif self.player and powerup.rect.colliderect(self.player.rect):
+                        self.player.activate_powerup(powerup.type)
+                        self.powerups.remove(powerup)
 
-                    # Update and draw obstacles
-                    for obstacle in self.obstacles[:]:
-                        obstacle.move()
-                        obstacle.draw()
-                        if obstacle.rect.top > WINDOW_HEIGHT:
-                            self.obstacles.remove(obstacle)
-                            if self.player:
-                                self.player.score += 10
-                        elif self.player and obstacle.rect.colliderect(self.player.rect) and not self.player.invincible:
-                            self.obstacles.remove(obstacle)
-                            self.player.lives -= 1
-                            self.player.invincible = True
-                            self.player.invincible_timer = time.time()
-                            if self.player.lives <= 0:
-                                self.game_over = True
+                # Update and draw obstacles
+                for obstacle in self.obstacles[:]:
+                    obstacle.move()
+                    obstacle.draw()
+                    if obstacle.rect.top > WINDOW_HEIGHT:
+                        self.obstacles.remove(obstacle)
+                        if self.player:
+                            self.player.score += 10
+                    elif self.player and obstacle.rect.colliderect(self.player.rect) and not self.player.invincible:
+                        self.obstacles.remove(obstacle)
+                        self.player.lives -= 1
+                        self.player.invincible = True
+                        self.player.invincible_timer = time.time()
+                        if self.player.lives <= 0:
+                            self.game_over = True
 
-                    # Draw players
-                    if self.player:
-                        self.player.draw()
-                        self.draw_lives(self.player, 10)
-                        self.draw_score(self.player, 10)
-                        self.draw_powerups(self.player, 70)
+                # Draw players
+                if self.player:
+                    self.player.draw()
+                    self.draw_lives(self.player, 10)
+                    self.draw_score(self.player, 10)
+                    self.draw_powerups(self.player, 70)
 
-                    for other_player in self.other_players.values():
-                        other_player.draw()
-                        self.draw_lives(other_player, 10 + 300)
-                        self.draw_score(other_player, 10 + 300)
+                for other_player in self.other_players.values():
+                    other_player.draw()
+                    self.draw_lives(other_player, 10 + 300)
+                    self.draw_score(other_player, 10 + 300)
 
-                pygame.display.flip()
-                clock.tick(FPS)
+            pygame.display.flip()
+            clock.tick(FPS)
 
         if self.network:
             self.network.close()
