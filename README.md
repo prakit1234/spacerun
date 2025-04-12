@@ -5,8 +5,8 @@ A thrilling 2D space racing game where you must win a deadly race to save your f
 ## Credits
 - **Created by**: Kaii
 - **GitHub**: [kaii](https://github.com/prakit1234)
--**Avatar**: ![Kaii's Avatar](https://camo.githubusercontent.com/41e66d161f44695150f4f312969b95e229083dec78d6a0d652a7d41160790807/68747470733a2f2f692e6962622e636f2f74504c32544b44592f746f6a692e706e67)
-- **Co_partner**:[Pd](https://github.com/PDgaming)
+-**Avatar**: [Kaii's Avatar](https://camo.githubusercontent.com/41e66d161f44695150f4f312969b95e229083dec78d6a0d652a7d41160790807/68747470733a2f2f692e6962622e636f2f74504c32544b44592f746f6a692e706e67)
+- **Co-partner**:[Pd](https://github.com/PDgaming)
 
 
 ## Story
