@@ -405,6 +405,7 @@ class Player:
         self.trail_particles = []
         self.last_trail_time = 0
         self.trail_interval = 0.1  # seconds between trail particles
+        self.powerups_remaining = 3  # Limit of 3 powerups per player
 
     def get_state(self):
         return {
@@ -414,7 +415,8 @@ class Player:
             'score': self.score,
             'lives': self.lives,
             'active_powerups': self.active_powerups,
-            'invincible': self.invincible
+            'invincible': self.invincible,
+            'powerups_remaining': self.powerups_remaining
         }
 
     def update_from_state(self, state):
@@ -424,15 +426,25 @@ class Player:
         self.lives = state['lives']
         self.active_powerups = state['active_powerups']
         self.invincible = state['invincible']
+        if 'powerups_remaining' in state:
+            self.powerups_remaining = state['powerups_remaining']
 
     def activate_powerup(self, powerup_type):
+        # Check if player has powerups remaining
+        if self.powerups_remaining <= 0:
+            return False  # Cannot activate powerup
+            
         self.active_powerups[powerup_type] = time.time()
+        self.powerups_remaining -= 1  # Decrement remaining powerups
+        
         if powerup_type == 'speed':
             self.speed = self.base_speed * 2
         elif powerup_type == 'shield':
             self.invincible = True
         elif powerup_type == 'time_slow':
             self.time_slow_factor = 0.5
+            
+        return True  # Successfully activated powerup
 
     def update_powerups(self):
         current_time = time.time()
@@ -453,7 +465,8 @@ class Player:
         if keys[self.controls['right']] and self.rect.right < WINDOW_WIDTH:
             self.rect.x += self.speed
         if keys[self.controls['powerup']] and not self.active_powerups:
-            self.activate_powerup(random.choice(['speed', 'shield', 'time_slow']))
+            if self.powerups_remaining > 0:  # Only activate if powerups remaining
+                self.activate_powerup(random.choice(['speed', 'shield', 'time_slow']))
 
         self.update_powerups()
 
@@ -602,6 +615,8 @@ class Game:
         self.powerup_spawn_interval = 5.0  # seconds between powerup spawns
         self.running = True
         self.clock = pygame.time.Clock()
+        self.level = 1
+        self.score_for_next_level = 1000  # Score needed to advance to next level
 
     def show_pause_menu(self):
         current_time = pygame.time.get_ticks()
@@ -780,7 +795,12 @@ class Game:
 
     def spawn_powerup(self):
         if random.random() < 0.005:  # 0.5% chance each frame
-            self.powerups.append(PowerUp())
+            powerup = PowerUp()
+            # 20% chance for a refill powerup at higher levels
+            if random.random() < 0.2 and self.level > 1:
+                powerup.type = 'refill'
+                powerup.colors['refill'] = PURPLE
+            self.powerups.append(powerup)
 
     def handle_story(self):
         if self.story_phase < len(self.story_text):
@@ -852,10 +872,29 @@ class Game:
 
     def draw_powerups(self, player, y_pos):
         """Draw powerups with better visuals"""
-        for powerup_type in player.active_powerups:
+        # First draw the powerups remaining indicator
+        powerup_count_bg = pygame.Rect(10, y_pos - 30, 150, 25)
+        pygame.draw.rect(screen, (50, 50, 50), powerup_count_bg, border_radius=5)
+        
+        # Create a visual indicator for powerups remaining
+        for i in range(3):  # Total slots
+            x_pos = 25 + i * 25
+            if i < player.powerups_remaining:
+                # Draw filled circle for available powerups
+                pygame.draw.circle(screen, GREEN, (x_pos, y_pos - 18), 8)
+            else:
+                # Draw empty circle for used powerups
+                pygame.draw.circle(screen, (100, 100, 100), (x_pos, y_pos - 18), 8, 2)
+        
+        # Draw "POWER-UPS:" text
+        count_text = self.small_font.render("POWER-UPS:", True, WHITE)
+        screen.blit(count_text, (85, y_pos - 25))
+        
+        # Draw active powerups
+        for i, powerup_type in enumerate(player.active_powerups):
             remaining_time = POWERUP_DURATION - (time.time() - player.active_powerups[powerup_type])
             # Draw powerup background
-            powerup_bg = pygame.Rect(10, y_pos, 150, 25)
+            powerup_bg = pygame.Rect(10, y_pos + i * 30, 150, 25)
             pygame.draw.rect(screen, (50, 50, 50), powerup_bg, border_radius=5)
             # Draw powerup icon
             icon_color = {
@@ -863,10 +902,10 @@ class Game:
                 'shield': CYAN,
                 'time_slow': ORANGE
             }[powerup_type]
-            pygame.draw.circle(screen, icon_color, (25, y_pos + 12), 8)
+            pygame.draw.circle(screen, icon_color, (25, y_pos + i * 30 + 12), 8)
             # Draw powerup text
             powerup_text = self.small_font.render(f"{powerup_type}: {remaining_time:.1f}s", True, WHITE)
-            screen.blit(powerup_text, (40, y_pos + 5))
+            screen.blit(powerup_text, (40, y_pos + i * 30 + 5))
 
     def run(self):
         running = True
@@ -989,6 +1028,18 @@ class Game:
                                 player.activate_powerup(powerup.type)
                                 self.powerups.remove(powerup)
                                 break
+
+            # Check score for level up and power-up refresh
+            if self.player and self.player.score >= self.score_for_next_level:
+                self.level += 1
+                self.score_for_next_level += 1000 * self.level  # Increase score needed for next level
+                self.player.powerups_remaining = 3  # Refresh powerups when leveling up
+                
+                # Create level up message
+                level_up_text = self.font.render(f"LEVEL UP! POWER-UPS REFRESHED!", True, GREEN)
+                screen.blit(level_up_text, (WINDOW_WIDTH//2 - 200, 100))
+                pygame.display.flip()
+                pygame.time.delay(1000)  # Show message for 1 second
 
             # Draw everything
             screen.fill(BLACK)
