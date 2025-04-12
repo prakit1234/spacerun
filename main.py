@@ -3,6 +3,7 @@ import sys
 import random
 import time
 import math
+import json
 
 # Initialize Pygame
 pygame.init()
@@ -27,6 +28,7 @@ PURPLE = (128, 0, 128)
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Space Run - Race for Family")
 clock = pygame.time.Clock()
+game_data = {}
 
 class Star:
     def __init__(self):
@@ -149,6 +151,12 @@ class Game:
         self.fade_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.fade_surface.fill(BLACK)
 
+    def update_story_setting(self):
+        global game_data
+        game_data = {"show_story": "false"}
+        with open("game_data.json", "w") as json_data:
+            json.dump(game_data, json_data)
+
     def spawn_obstacle(self):
         if random.random() < 0.02:
             self.obstacles.append(Obstacle())
@@ -171,6 +179,7 @@ class Game:
                 self.story_start_time = current_time
                 if self.story_phase >= len(self.story_text):
                     self.showing_story = False
+                    self.update_story_setting()
                     return
 
             text = self.story_text[self.story_phase]
@@ -199,6 +208,23 @@ class Game:
         screen.blit(score_text, (WINDOW_WIDTH - 150, 10))
 
     def run(self):
+        global game_data
+        try:
+            with open("game_data.json") as json_data:
+                game_data = json.load(json_data)
+        except (FileNotFoundError, json.JSONDecodeError):
+            game_data = {"show_story": "true"}
+            with open("game_data.json", "w") as json_data:
+                json.dump(game_data, json_data)
+
+        if game_data == {}:
+            game_data = {"show_story": "true"}
+        else:
+            if game_data.get("show_story") == "true":
+                self.showing_story = True
+            else:
+                self.showing_story = False
+
         running = True
         while running:
             for event in pygame.event.get():
@@ -213,6 +239,7 @@ class Game:
                             self.story_start_time = time.time()
                             if self.story_phase >= len(self.story_text):
                                 self.showing_story = False
+                                self.update_story_setting()
 
             screen.fill(BLACK)
 
