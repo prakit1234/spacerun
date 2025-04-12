@@ -3,14 +3,11 @@ import sys
 import random
 import time
 import math
-<<<<<<< HEAD
 import json
-=======
 import socket
 import threading
 import json
 import select
->>>>>>> 19cd523d330dac0de51f22d99ce50ac914e0fe58
 
 # Initialize Pygame
 pygame.init()
@@ -71,6 +68,8 @@ class Obstacle:
         self.is_cheating = random.random() < 0.3
         self.rotation = 0
         self.rotation_speed = random.uniform(-2, 2)
+        self.pulse_scale = 1.0
+        self.pulse_growing = True
 
     def move(self):
         self.rect.y += self.speed
@@ -79,20 +78,51 @@ class Obstacle:
         self.rotation += self.rotation_speed
 
     def draw(self):
+        # Create obstacle surface
+        obstacle_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        
+        # Draw main body with pulse effect
+        if self.pulse_growing:
+            self.pulse_scale += 0.02
+            if self.pulse_scale >= 1.2:
+                self.pulse_growing = False
+        else:
+            self.pulse_scale -= 0.02
+            if self.pulse_scale <= 0.8:
+                self.pulse_growing = True
+
+        # Draw obstacle with rotation and pulse
         color = YELLOW if self.is_cheating else RED
         points = [
-            (self.rect.centerx, self.rect.top),
-            (self.rect.right, self.rect.bottom),
-            (self.rect.left, self.rect.bottom)
+            (self.width//2, 0),
+            (self.width, self.height),
+            (self.width//2, self.height - 10),
+            (0, self.height)
         ]
+        
+        # Apply rotation
         rotated_points = []
         for point in points:
-            x = point[0] - self.rect.centerx
-            y = point[1] - self.rect.centery
+            x = point[0] - self.width//2
+            y = point[1] - self.height//2
             rotated_x = x * math.cos(math.radians(self.rotation)) - y * math.sin(math.radians(self.rotation))
             rotated_y = x * math.sin(math.radians(self.rotation)) + y * math.cos(math.radians(self.rotation))
-            rotated_points.append((rotated_x + self.rect.centerx, rotated_y + self.rect.centery))
-        pygame.draw.polygon(screen, color, rotated_points)
+            rotated_points.append((
+                rotated_x * self.pulse_scale + self.width//2,
+                rotated_y * self.pulse_scale + self.height//2
+            ))
+        
+        pygame.draw.polygon(obstacle_surface, color, rotated_points)
+        
+        # Add details
+        if self.is_cheating:
+            # Draw warning symbol
+            pygame.draw.line(obstacle_surface, WHITE, 
+                           (self.width//2, 5), (self.width//2, self.height - 5), 2)
+            pygame.draw.line(obstacle_surface, WHITE, 
+                           (5, self.height//2), (self.width - 5, self.height//2), 2)
+        
+        screen.blit(obstacle_surface, self.rect)
 
 class PowerUp:
     def __init__(self):
@@ -109,26 +139,82 @@ class PowerUp:
             'time_slow': ORANGE
         }
         self.rotation = 0
+        self.pulse_scale = 1.0
+        self.pulse_growing = True
+        self.glow_radius = 0
+        self.glow_growing = True
 
     def move(self):
         self.rect.y += self.speed
         self.rotation += 2
 
     def draw(self):
-        color = self.colors[self.type]
+        # Create powerup surface
+        powerup_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        
+        # Update pulse effect
+        if self.pulse_growing:
+            self.pulse_scale += 0.02
+            if self.pulse_scale >= 1.2:
+                self.pulse_growing = False
+        else:
+            self.pulse_scale -= 0.02
+            if self.pulse_scale <= 0.8:
+                self.pulse_growing = True
+
+        # Update glow effect
+        if self.glow_growing:
+            self.glow_radius += 0.5
+            if self.glow_radius >= 15:
+                self.glow_growing = False
+        else:
+            self.glow_radius -= 0.5
+            if self.glow_radius <= 10:
+                self.glow_growing = True
+
+        # Draw glow
+        glow_surface = pygame.Surface((30, 30), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surface, (*self.colors[self.type], 128), 
+                         (15, 15), self.glow_radius)
+        powerup_surface.blit(glow_surface, (-5, -5))
+
+        # Draw powerup icon
         points = [
-            (self.rect.centerx, self.rect.top),
-            (self.rect.right, self.rect.bottom),
-            (self.rect.left, self.rect.bottom)
+            (self.width//2, 0),
+            (self.width, self.height),
+            (self.width//2, self.height - 10),
+            (0, self.height)
         ]
+        
+        # Apply rotation and pulse
         rotated_points = []
         for point in points:
-            x = point[0] - self.rect.centerx
-            y = point[1] - self.rect.centery
+            x = point[0] - self.width//2
+            y = point[1] - self.height//2
             rotated_x = x * math.cos(math.radians(self.rotation)) - y * math.sin(math.radians(self.rotation))
             rotated_y = x * math.sin(math.radians(self.rotation)) + y * math.cos(math.radians(self.rotation))
-            rotated_points.append((rotated_x + self.rect.centerx, rotated_y + self.rect.centery))
-        pygame.draw.polygon(screen, color, rotated_points)
+            rotated_points.append((
+                rotated_x * self.pulse_scale + self.width//2,
+                rotated_y * self.pulse_scale + self.height//2
+            ))
+        
+        pygame.draw.polygon(powerup_surface, self.colors[self.type], rotated_points)
+        
+        # Add type-specific details
+        if self.type == 'speed':
+            pygame.draw.line(powerup_surface, WHITE, 
+                           (5, 5), (self.width - 5, self.height - 5), 2)
+            pygame.draw.line(powerup_surface, WHITE, 
+                           (5, self.height - 5), (self.width - 5, 5), 2)
+        elif self.type == 'shield':
+            pygame.draw.circle(powerup_surface, WHITE, 
+                             (self.width//2, self.height//2), 5, 2)
+        elif self.type == 'time_slow':
+            pygame.draw.arc(powerup_surface, WHITE, 
+                          (5, 5, self.width - 10, self.height - 10), 
+                          math.pi/4, 3*math.pi/4, 2)
+        
+        screen.blit(powerup_surface, self.rect)
 
 class EnhancedObstacle(Obstacle):
     def __init__(self):
@@ -165,56 +251,129 @@ class EnhancedObstacle(Obstacle):
             pygame.draw.circle(screen, CYAN, self.rect.center, self.width + 5, 2)
 
 class NetworkManager:
-    def __init__(self, is_host=False):
-        self.is_host = is_host
+    def __init__(self, is_server=False, server_ip=None):
+        self.is_server = is_server
+        self.server_ip = server_ip
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connected = False
-        self.other_players = {}
-        self.receive_thread = None
+        self.clients = {}  # Only used by server
+        self.client_id = None  # Only used by client
+        self.running = True
 
-    def host_game(self):
-        self.socket.bind(('0.0.0.0', PORT))
-        self.socket.listen(1)
-        print(f"Waiting for connection on port {PORT}...")
-        client_socket, address = self.socket.accept()
-        self.socket = client_socket
-        self.connected = True
-        self.start_receive_thread()
+    def start_server(self):
+        """Start the game server"""
+        try:
+            self.socket.bind(('0.0.0.0', 5000))
+            self.socket.listen(5)
+            print(f"Server started on port 5000")
+            threading.Thread(target=self.accept_connections).start()
+            return True
+        except Exception as e:
+            print(f"Failed to start server: {e}")
+            return False
 
-    def join_game(self, host_ip):
-        self.socket.connect((host_ip, PORT))
-        self.connected = True
-        self.start_receive_thread()
-
-    def start_receive_thread(self):
-        self.receive_thread = threading.Thread(target=self.receive_data)
-        self.receive_thread.daemon = True
-        self.receive_thread.start()
-
-    def receive_data(self):
-        while self.connected:
+    def accept_connections(self):
+        """Accept new client connections"""
+        while self.running:
             try:
-                data = self.socket.recv(BUFFER_SIZE)
-                if not data:
-                    break
-                player_data = json.loads(data.decode())
-                self.other_players[player_data['id']] = player_data
+                client_socket, address = self.socket.accept()
+                client_id = str(len(self.clients) + 1)
+                self.clients[client_id] = {
+                    'socket': client_socket,
+                    'address': address,
+                    'player': None
+                }
+                print(f"New connection from {address} as client {client_id}")
+                threading.Thread(target=self.handle_client, args=(client_id,)).start()
             except:
                 break
-        self.connected = False
 
-    def send_data(self, player_data):
-        if self.connected:
+    def handle_client(self, client_id):
+        """Handle communication with a specific client"""
+        client = self.clients[client_id]
+        while self.running:
             try:
-                self.socket.send(json.dumps(player_data).encode())
+                data = client['socket'].recv(1024)
+                if not data:
+                    break
+                message = json.loads(data.decode())
+                self.broadcast(message, exclude=client_id)
             except:
-                self.connected = False
+                break
+        self.remove_client(client_id)
 
-    def close(self):
-        self.connected = False
-        if self.receive_thread:
-            self.receive_thread.join()
-        self.socket.close()
+    def broadcast(self, message, exclude=None):
+        """Send message to all clients except the excluded one"""
+        for cid, client in self.clients.items():
+            if cid != exclude:
+                try:
+                    client['socket'].send(json.dumps(message).encode())
+                except:
+                    self.remove_client(cid)
+
+    def remove_client(self, client_id):
+        """Remove a disconnected client"""
+        if client_id in self.clients:
+            try:
+                self.clients[client_id]['socket'].close()
+            except:
+                pass
+            del self.clients[client_id]
+            print(f"Client {client_id} disconnected")
+
+    def connect_to_server(self):
+        """Connect to the game server"""
+        try:
+            self.socket.connect((self.server_ip, 5000))
+            self.client_id = str(uuid.uuid4())[:8]
+            threading.Thread(target=self.receive_messages).start()
+            return True
+        except Exception as e:
+            print(f"Failed to connect to server: {e}")
+            return False
+
+    def receive_messages(self):
+        """Receive messages from the server"""
+        while self.running:
+            try:
+                data = self.socket.recv(1024)
+                if not data:
+                    break
+                message = json.loads(data.decode())
+                self.handle_server_message(message)
+            except:
+                break
+        self.disconnect()
+
+    def handle_server_message(self, message):
+        """Handle incoming server messages"""
+        if 'type' in message:
+            if message['type'] == 'player_join':
+                self.game.add_remote_player(message['player_id'], message['player_data'])
+            elif message['type'] == 'player_update':
+                self.game.update_remote_player(message['player_id'], message['player_data'])
+            elif message['type'] == 'player_leave':
+                self.game.remove_remote_player(message['player_id'])
+
+    def send_message(self, message_type, data):
+        """Send a message to the server"""
+        if not self.is_server and self.socket:
+            try:
+                message = {
+                    'type': message_type,
+                    'client_id': self.client_id,
+                    'data': data
+                }
+                self.socket.send(json.dumps(message).encode())
+            except:
+                self.disconnect()
+
+    def disconnect(self):
+        """Disconnect from the server"""
+        self.running = False
+        try:
+            self.socket.close()
+        except:
+            pass
 
 class Player:
     def __init__(self, x, controls, color, name, player_id):
@@ -229,6 +388,10 @@ class Player:
         self.score = 0
         self.invincible = False
         self.invincible_timer = 0
+        self.invincible_duration = 2.0  # 2 seconds of invincibility after hit
+        self.blink_timer = 0
+        self.blink_interval = 0.1  # Blink every 0.1 seconds
+        self.visible = True
         self.engine_particles = []
         self.active_powerups = {}
         self.time_slow_factor = 1.0
@@ -237,6 +400,11 @@ class Player:
         self.name = name
         self.id = player_id
         self.last_update = time.time()
+        self.shield_radius = 0
+        self.shield_growing = True
+        self.trail_particles = []
+        self.last_trail_time = 0
+        self.trail_interval = 0.1  # seconds between trail particles
 
     def get_state(self):
         return {
@@ -289,35 +457,101 @@ class Player:
 
         self.update_powerups()
 
-    def draw(self):
-        # Draw engine particles
-        for particle in self.engine_particles[:]:
-            particle[1] += 2
-            particle[2] -= 1
-            if particle[2] <= 0:
-                self.engine_particles.remove(particle)
+    def update(self):
+        # Update invincibility
+        if self.invincible:
+            current_time = time.time()
+            if current_time - self.invincible_timer >= self.invincible_duration:
+                self.invincible = False
             else:
-                pygame.draw.circle(screen, (255, 165, 0), (particle[0], particle[1]), particle[2])
+                # Blink effect
+                self.blink_timer += 1
+                if self.blink_timer >= self.blink_interval * FPS:
+                    self.visible = not self.visible
+                    self.blink_timer = 0
 
-        # Add new particles
-        if random.random() < 0.3:
-            self.engine_particles.append([self.rect.centerx, self.rect.bottom, random.randint(2, 4)])
+    def draw(self):
+        if not self.visible and self.invincible:
+            return  # Skip drawing during blink when invincible
+        # Draw engine trail
+        current_time = time.time()
+        if current_time - self.last_trail_time >= self.trail_interval:
+            self.trail_particles.append([self.rect.centerx, self.rect.bottom, 5])
+            self.last_trail_time = current_time
 
-        # Draw spaceship
+        # Update and draw trail particles
+        for particle in self.trail_particles[:]:
+            particle[1] += 2
+            particle[2] -= 0.2
+            if particle[2] <= 0:
+                self.trail_particles.remove(particle)
+            else:
+                alpha = int(255 * (particle[2] / 5))
+                trail_surface = pygame.Surface((4, 4), pygame.SRCALPHA)
+                pygame.draw.circle(trail_surface, (*self.color, alpha), (2, 2), particle[2])
+                screen.blit(trail_surface, (particle[0] - 2, particle[1] - 2))
+
+        # Draw shield effect
+        if self.invincible:
+            if self.shield_growing:
+                self.shield_radius += 1
+                if self.shield_radius >= 30:
+                    self.shield_growing = False
+            else:
+                self.shield_radius -= 1
+                if self.shield_radius <= 20:
+                    self.shield_growing = True
+
+            shield_surface = pygame.Surface((60, 60), pygame.SRCALPHA)
+            pygame.draw.circle(shield_surface, (*CYAN, 128), (30, 30), self.shield_radius, 2)
+            screen.blit(shield_surface, (self.rect.centerx - 30, self.rect.centery - 30))
+
+        # Draw spaceship with better visuals
+        ship_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        
+        # Draw main body
         points = [
-            (self.rect.centerx, self.rect.top),
-            (self.rect.right, self.rect.bottom),
-            (self.rect.left, self.rect.bottom)
+            (self.width//2, 0),  # Nose
+            (self.width, self.height),  # Bottom right
+            (self.width//2, self.height - 10),  # Bottom center
+            (0, self.height)  # Bottom left
         ]
-        color = PURPLE if self.invincible else self.color
-        pygame.draw.polygon(screen, color, points)
+        pygame.draw.polygon(ship_surface, self.color, points)
+        
+        # Draw cockpit
+        pygame.draw.ellipse(ship_surface, (200, 200, 255), 
+                          (self.width//2 - 10, 5, 20, 15))
+        
+        # Draw engine glow
+        if random.random() < 0.3:
+            glow_points = [
+                (self.width//2 - 5, self.height - 5),
+                (self.width//2 + 5, self.height - 5),
+                (self.width//2, self.height + 10)
+            ]
+            pygame.draw.polygon(ship_surface, (255, 165, 0), glow_points)
+        
+        # Draw details
+        pygame.draw.line(ship_surface, (255, 255, 255), 
+                        (self.width//2 - 5, 5), (self.width//2 - 5, 15), 2)
+        pygame.draw.line(ship_surface, (255, 255, 255), 
+                        (self.width//2 + 5, 5), (self.width//2 + 5, 15), 2)
+        
+        screen.blit(ship_surface, self.rect)
 
-        # Draw player name
+        # Draw player name with better styling
+        name_surface = pygame.Surface((100, 30), pygame.SRCALPHA)
+        pygame.draw.rect(name_surface, (*BLACK, 128), (0, 0, 100, 30), border_radius=5)
         name_text = game.small_font.render(self.name, True, WHITE)
-        screen.blit(name_text, (self.rect.centerx - 20, self.rect.top - 20))
+        name_surface.blit(name_text, (5, 5))
+        screen.blit(name_surface, (self.rect.centerx - 50, self.rect.top - 35))
 
 class Game:
     def __init__(self):
+        self.reset_game()
+    
+    def reset_game(self):
+        """Reset the game to initial state with menu active"""
         self.network = None
         self.player = None
         self.other_players = {}
@@ -344,8 +578,8 @@ class Game:
         self.fade_alpha = 0
         self.fade_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.fade_surface.fill(BLACK)
-        self.menu_active = True
-        self.menu_options = ["Host Game", "Join Game", "Exit"]
+        self.menu_active = True  # Ensure menu is active at start
+        self.menu_options = ["Start Server", "Join Server", "Exit"]
         self.selected_option = 0
         self.host_ip = ""
         self.player_name = "Player"
@@ -358,6 +592,16 @@ class Game:
         self.selected_pause_option = 0
         self.last_pause_update = 0
         self.pause_update_interval = 100  # milliseconds
+        self.server = None
+        self.is_hosting = False
+        self.max_lives = 3
+        self.life_icons = []  # Store life icon positions and states
+        self.last_obstacle_spawn = 0
+        self.obstacle_spawn_interval = 1.0  # seconds between obstacle spawns
+        self.last_powerup_spawn = 0
+        self.powerup_spawn_interval = 5.0  # seconds between powerup spawns
+        self.running = True
+        self.clock = pygame.time.Clock()
 
     def show_pause_menu(self):
         current_time = pygame.time.get_ticks()
@@ -398,7 +642,7 @@ class Game:
                     if self.selected_pause_option == 0:  # Resume
                         self.paused = False
                     elif self.selected_pause_option == 1:  # Restart
-                        self.__init__()
+                        self.reset_game()  # Use reset_game instead of __init__
                     elif self.selected_pause_option == 2:  # Exit to Menu
                         self.menu_active = True
                         self.paused = False
@@ -415,18 +659,17 @@ class Game:
         self.last_menu_update = current_time
         screen.fill(BLACK)
         
-        # Draw animated stars in background
+        # Draw stars in background
         for star in self.stars:
             star.move()
             star.draw()
 
-        # Draw game title with animation
         title = self.font.render("SPACE RUN", True, WHITE)
         subtitle = self.small_font.render("Multiplayer Space Racing", True, WHITE)
         screen.blit(title, (WINDOW_WIDTH/2 - 100, 100))
         screen.blit(subtitle, (WINDOW_WIDTH/2 - 150, 150))
 
-        # Draw player name input with better styling
+        # Draw player name input
         name_label = self.small_font.render("YOUR NAME:", True, WHITE)
         name_box = pygame.Rect(WINDOW_WIDTH/2 - 100, 200, 200, 40)
         pygame.draw.rect(screen, GREEN if self.inputting_name else WHITE, name_box, 2)
@@ -434,15 +677,16 @@ class Game:
         screen.blit(name_label, (WINDOW_WIDTH/2 - 200, 210))
         screen.blit(name_text, (WINDOW_WIDTH/2 - 90, 210))
 
-        # Draw menu options with better spacing
-        for i, option in enumerate(self.menu_options):
+        # Draw menu options
+        menu_options = ["Start Server", "Join Server", "Exit"]
+        for i, option in enumerate(menu_options):
             color = GREEN if i == self.selected_option else WHITE
             text = self.font.render(option, True, color)
             screen.blit(text, (WINDOW_WIDTH/2 - 100, 300 + i * 50))
 
-        # Draw IP input with better styling
-        if self.selected_option == 1:  # Join Game
-            ip_label = self.small_font.render("HOST IP:", True, WHITE)
+        # Draw server IP input
+        if self.selected_option == 1:  # Join Server
+            ip_label = self.small_font.render("SERVER IP:", True, WHITE)
             ip_box = pygame.Rect(WINDOW_WIDTH/2 - 100, 450, 200, 40)
             pygame.draw.rect(screen, GREEN if self.inputting_ip else WHITE, ip_box, 2)
             ip_text = self.font.render(self.host_ip, True, GREEN if self.inputting_ip else WHITE)
@@ -483,37 +727,40 @@ class Game:
                         self.host_ip += event.unicode
                 else:
                     if event.key == pygame.K_UP:
-                        self.selected_option = (self.selected_option - 1) % len(self.menu_options)
+                        self.selected_option = (self.selected_option - 1) % 3
                     elif event.key == pygame.K_DOWN:
-                        self.selected_option = (self.selected_option + 1) % len(self.menu_options)
+                        self.selected_option = (self.selected_option + 1) % 3
                     elif event.key == pygame.K_RETURN:
-                        if self.selected_option == 0:  # Host Game
-                            self.network = NetworkManager(is_host=True)
-                            self.player = Player(
-                                WINDOW_WIDTH // 2,
-                                {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'powerup': pygame.K_p},
-                                BLUE,
-                                self.player_name,
-                                "1"
-                            )
-                            threading.Thread(target=self.network.host_game).start()
-                            self.menu_active = False
-                        elif self.selected_option == 1:  # Join Game
-                            if self.host_ip:
-                                self.network = NetworkManager(is_host=False)
+                        if self.selected_option == 0:  # Start Server
+                            self.server = NetworkManager(is_server=True)
+                            if self.server.start_server():
+                                self.is_hosting = True
                                 self.player = Player(
                                     WINDOW_WIDTH // 2,
                                     {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'powerup': pygame.K_p},
-                                    RED,
+                                    BLUE,
                                     self.player_name,
-                                    "2"
+                                    "host"
                                 )
-                                self.network.join_game(self.host_ip)
                                 self.menu_active = False
-                        elif event.key == pygame.K_n and not self.inputting_ip:
-                            self.inputting_name = True
-                        elif event.key == pygame.K_i and not self.inputting_name:
-                            self.inputting_ip = True
+                        elif self.selected_option == 1:  # Join Server
+                            if self.host_ip:
+                                self.network = NetworkManager(is_server=False, server_ip=self.host_ip)
+                                if self.network.connect_to_server():
+                                    self.player = Player(
+                                        WINDOW_WIDTH // 2,
+                                        {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'powerup': pygame.K_p},
+                                        RED,
+                                        self.player_name,
+                                        "client"
+                                    )
+                                    self.menu_active = False
+                        elif self.selected_option == 2:  # Exit
+                            return False
+                    elif event.key == pygame.K_n and not self.inputting_ip:
+                        self.inputting_name = True
+                    elif event.key == pygame.K_i and not self.inputting_name:
+                        self.inputting_ip = True
         return True
 
     def update_story_setting(self):
@@ -566,74 +813,64 @@ class Game:
             screen.blit(self.fade_surface, (0, 0))
 
     def draw_lives(self, player, x_offset):
-        for i in range(player.lives):
+        """Draw life icons with better visuals"""
+        for i in range(3):  # Always show 3 life slots
             x = x_offset + i * 30
             y = 10
-            points = [
-                (x + 10, y),
-                (x + 20, y + 10),
-                (x + 10, y + 20),
-                (x, y + 10)
-            ]
-            pygame.draw.polygon(screen, player.color, points)
+            # Draw life icon background
+            pygame.draw.circle(screen, (50, 50, 50), (x + 15, y + 15), 12)
+            # Draw life icon
+            if i < player.lives:
+                # Draw filled heart for active lives
+                points = [
+                    (x + 15, y + 5),  # Top point
+                    (x + 5, y + 15),  # Left point
+                    (x + 15, y + 25),  # Bottom point
+                    (x + 25, y + 15)   # Right point
+                ]
+                pygame.draw.polygon(screen, player.color, points)
+                # Add shine effect
+                pygame.draw.circle(screen, (255, 255, 255, 128), (x + 18, y + 8), 3)
+            else:
+                # Draw empty heart for lost lives
+                points = [
+                    (x + 15, y + 5),
+                    (x + 5, y + 15),
+                    (x + 15, y + 25),
+                    (x + 25, y + 15)
+                ]
+                pygame.draw.polygon(screen, (100, 100, 100), points, 2)
 
     def draw_score(self, player, x_offset):
+        """Draw score with better visuals"""
+        # Draw score background
+        score_bg = pygame.Rect(x_offset, 40, 150, 30)
+        pygame.draw.rect(screen, (50, 50, 50), score_bg, border_radius=5)
+        # Draw score text
         score_text = self.small_font.render(f"{player.name}: {player.score}", True, WHITE)
-        screen.blit(score_text, (x_offset, 40))
+        screen.blit(score_text, (x_offset + 10, 45))
 
     def draw_powerups(self, player, y_pos):
+        """Draw powerups with better visuals"""
         for powerup_type in player.active_powerups:
             remaining_time = POWERUP_DURATION - (time.time() - player.active_powerups[powerup_type])
+            # Draw powerup background
+            powerup_bg = pygame.Rect(10, y_pos, 150, 25)
+            pygame.draw.rect(screen, (50, 50, 50), powerup_bg, border_radius=5)
+            # Draw powerup icon
+            icon_color = {
+                'speed': GREEN,
+                'shield': CYAN,
+                'time_slow': ORANGE
+            }[powerup_type]
+            pygame.draw.circle(screen, icon_color, (25, y_pos + 12), 8)
+            # Draw powerup text
             powerup_text = self.small_font.render(f"{powerup_type}: {remaining_time:.1f}s", True, WHITE)
-            screen.blit(powerup_text, (10, y_pos))
-            y_pos += 20
+            screen.blit(powerup_text, (40, y_pos + 5))
 
     def run(self):
-        global game_data
-        try:
-            with open("game_data.json") as json_data:
-                game_data = json.load(json_data)
-        except (FileNotFoundError, json.JSONDecodeError):
-            game_data = {"show_story": "true"}
-            with open("game_data.json", "w") as json_data:
-                json.dump(game_data, json_data)
-
-        if game_data == {}:
-            game_data = {"show_story": "true"}
-        else:
-            if game_data.get("show_story") == "true":
-                self.showing_story = True
-            else:
-                self.showing_story = False
-
         running = True
         while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        if self.game_over:
-                            self.__init__()
-                        elif self.showing_story:
-                            self.story_phase += 1
-                            self.story_start_time = time.time()
-                            if self.story_phase >= len(self.story_text):
-                                self.showing_story = False
-                                self.update_story_setting()
-
-            screen.fill(BLACK)
-
-            # Draw stars
-            for star in self.stars:
-                star.move()
-                star.draw()
-
-            if self.showing_story:
-                self.handle_story()
-            elif self.game_over:
-                game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
-                screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
             if self.menu_active:
                 running = self.handle_menu_input()
                 self.show_menu()
@@ -692,84 +929,111 @@ class Game:
                                 if self.story_phase >= len(self.story_text):
                                     self.showing_story = False
 
-                screen.fill(BLACK)
+            # Update game state
+            if not self.showing_story and not self.game_over:
+                current_time = time.time()
 
-                # Draw stars
-                for star in self.stars:
-                    star.move()
-                    star.draw()
+                # Update local player
+                if self.player:
+                    self.player.move()
+                    self.player.update_powerups()
+                    self.player.update()
+                    if self.network and not self.is_hosting:
+                        self.network.send_message('player_update', self.player.get_state())
 
-                if self.showing_story:
-                    self.handle_story()
-                elif self.game_over:
-                    game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
-                    screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
-                else:
-                    # Gameplay
-                    if self.player:
-                        self.player.move()
-                        if self.network and self.network.connected:
-                            self.network.send_data(self.player.get_state())
-                            for player_id, player_data in self.network.other_players.items():
-                                if player_id not in self.other_players:
-                                    self.other_players[player_id] = Player(
-                                        player_data['x'],
-                                        None,
-                                        RED if player_id == "2" else BLUE,
-                                        f"Player {player_id}",
-                                        player_id
-                                    )
-                                self.other_players[player_id].update_from_state(player_data)
+                # Update other players
+                for player_id, player in self.other_players.items():
+                    player.move()
+                    player.update_powerups()
+                    player.update()
 
+                # Spawn obstacles with proper timing
+                if current_time - self.last_obstacle_spawn >= self.obstacle_spawn_interval:
                     self.spawn_obstacle()
+                    self.last_obstacle_spawn = current_time
+
+                # Spawn powerups with proper timing
+                if current_time - self.last_powerup_spawn >= self.powerup_spawn_interval:
                     self.spawn_powerup()
+                    self.last_powerup_spawn = current_time
 
-                    # Update and draw powerups
-                    for powerup in self.powerups[:]:
-                        powerup.move()
-                        powerup.draw()
-                        if powerup.rect.top > WINDOW_HEIGHT:
-                            self.powerups.remove(powerup)
-                        elif self.player and powerup.rect.colliderect(self.player.rect):
-                            self.player.activate_powerup(powerup.type)
-                            self.powerups.remove(powerup)
-
-                    # Update and draw obstacles
-                    for obstacle in self.obstacles[:]:
-                        obstacle.move()
-                        obstacle.draw()
-                        if obstacle.rect.top > WINDOW_HEIGHT:
-                            self.obstacles.remove(obstacle)
-                            if self.player:
-                                self.player.score += 10
-                        elif self.player and obstacle.rect.colliderect(self.player.rect) and not self.player.invincible:
-                            self.obstacles.remove(obstacle)
+                # Update obstacles and powerups
+                for obstacle in self.obstacles[:]:
+                    obstacle.move()
+                    if self.player and obstacle.rect.colliderect(self.player.rect):
+                        if not self.player.invincible:
                             self.player.lives -= 1
                             self.player.invincible = True
                             self.player.invincible_timer = time.time()
                             if self.player.lives <= 0:
                                 self.game_over = True
+                        self.obstacles.remove(obstacle)
+                    else:
+                        for player_id, player in self.other_players.items():
+                            if obstacle.rect.colliderect(player.rect):
+                                if not player.invincible:
+                                    player.lives -= 1
+                                    player.invincible = True
+                                    player.invincible_timer = time.time()
+                                self.obstacles.remove(obstacle)
+                                break
 
-                    # Draw players
-                    if self.player:
-                        self.player.draw()
-                        self.draw_lives(self.player, 10)
-                        self.draw_score(self.player, 10)
-                        self.draw_powerups(self.player, 70)
+                for powerup in self.powerups[:]:
+                    powerup.move()
+                    if self.player and powerup.rect.colliderect(self.player.rect):
+                        self.player.activate_powerup(powerup.type)
+                        self.powerups.remove(powerup)
+                    else:
+                        for player_id, player in self.other_players.items():
+                            if powerup.rect.colliderect(player.rect):
+                                player.activate_powerup(powerup.type)
+                                self.powerups.remove(powerup)
+                                break
 
-                    for other_player in self.other_players.values():
-                        other_player.draw()
-                        self.draw_lives(other_player, 10 + 300)
-                        self.draw_score(other_player, 10 + 300)
+            # Draw everything
+            screen.fill(BLACK)
+            
+            # Draw stars
+            for star in self.stars:
+                star.move()
+                star.draw()
 
-                pygame.display.flip()
-                clock.tick(FPS)
+            if self.showing_story:
+                self.handle_story()
+            elif self.game_over:
+                self.show_game_over()
+            elif self.paused:
+                self.show_pause_menu()
+            else:
+                # Draw game elements
+                for obstacle in self.obstacles:
+                    obstacle.draw()
+                for powerup in self.powerups:
+                    powerup.draw()
+                if self.player:
+                    self.player.draw()
+                    self.draw_lives(self.player, 10)
+                    self.draw_score(self.player, 10)
+                    self.draw_powerups(self.player, 70)
+                for player_id, player in self.other_players.items():
+                    player.draw()
+                    self.draw_lives(player, 10 + 300)
+                    self.draw_score(player, 10 + 300)
+                    self.draw_powerups(player, 70 + 300)
 
-        if self.network:
-            self.network.close()
-        pygame.quit()
-        sys.exit()
+            pygame.display.flip()
+            self.clock.tick(FPS)  # Maintain consistent frame rate
+
+    def show_game_over(self):
+        """Display the game over screen"""
+        game_over_text = self.font.render("GAME OVER", True, RED)
+        score_text = self.font.render(f"Final Score: {self.player.score}", True, WHITE)
+        restart_text = self.font.render("Press SPACE to restart", True, WHITE)
+        
+        screen.blit(game_over_text, (WINDOW_WIDTH//2 - 100, WINDOW_HEIGHT//2 - 50))
+        screen.blit(score_text, (WINDOW_WIDTH//2 - 100, WINDOW_HEIGHT//2))
+        screen.blit(restart_text, (WINDOW_WIDTH//2 - 150, WINDOW_HEIGHT//2 + 50))
 
 if __name__ == "__main__":
     game = Game()
-    game.run() 
+    game.run()
