@@ -608,7 +608,6 @@ class Game:
 
         running = True
         while running:
-<<<<<<< HEAD
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -635,7 +634,6 @@ class Game:
             elif self.game_over:
                 game_over_text = self.font.render("GAME OVER - Press SPACE to restart", True, WHITE)
                 screen.blit(game_over_text, (WINDOW_WIDTH/2 - 200, WINDOW_HEIGHT/2))
-=======
             if self.menu_active:
                 running = self.handle_menu_input()
                 self.show_menu()
@@ -677,7 +675,6 @@ class Game:
                     screen.blit(text, (WINDOW_WIDTH/2 - 100, 300 + i * 50))
                 
                 pygame.display.flip()
->>>>>>> 19cd523d330dac0de51f22d99ce50ac914e0fe58
             else:
                 # Gameplay loop
                 for event in pygame.event.get():
